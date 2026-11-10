@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>MAKAUT 3D — Campus Navigator</title>
+    <meta name="description" content="Interactive 3D Campus Navigator & Wayfinding for Maulana Abul Kalam Azad University of Technology (MAKAUT), Haringhata." />
+  </head>
+  <body class="bg-slate-900 text-slate-100 overflow-hidden select-none">
+    <div id="app" class="relative w-screen h-screen overflow-hidden">
+      <!-- WebGL 3D Canvas will be injected here -->
+      <div id="canvas-container" class="absolute inset-0 z-0 bg-gradient-to-b from-sky-200 via-sky-100 to-slate-200"></div>
+
+      <!-- Top Navigation Bar -->
+      <header class="absolute top-0 left-0 right-0 z-20 p-3 sm:p-4 flex items-center justify-between pointer-events-none gap-2">
+        <!-- Logo & Title -->
+        <div class="pointer-events-auto flex items-center gap-2.5 bg-white/85 dark:bg-slate-900/85 backdrop-blur-md px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-2xl shadow-lg border border-white/40 dark:border-slate-800/80 transition-all">
+          <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center text-white font-black text-sm shadow-md shadow-blue-500/30">
+            M
+          </div>
+          <div>
+            <div class="flex items-center gap-1.5">
+              <span class="font-bold text-sm sm:text-base tracking-tight text-slate-900 dark:text-white">MAKAUT 3D</span>
+              <span class="text-[10px] uppercase font-extrabold px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300">Main</span>
+            </div>
+            <p class="text-[10px] text-slate-500 dark:text-slate-400 font-medium">Haringhata Campus</p>
+          </div>
+        </div>
+
+        <!-- Search Bar Trigger -->
+        <button id="search-trigger-btn" class="pointer-events-auto flex-1 max-w-md mx-2 flex items-center justify-between gap-3 bg-white/90 dark:bg-slate-900/90 hover:bg-white dark:hover:bg-slate-900 backdrop-blur-md px-4 py-2.5 rounded-2xl shadow-lg border border-white/40 dark:border-slate-800/80 transition-all group cursor-pointer text-left">
+          <div class="flex items-center gap-2.5 text-slate-500 dark:text-slate-400 text-xs sm:text-sm font-medium">
+            <svg class="w-4 h-4 text-slate-400 group-hover:text-blue-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+            </svg>
+            <span class="truncate">Search departments, buildings, canteen...</span>
+          </div>
+          <kbd class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-semibold text-slate-500 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md shadow-xs">
+            <span class="text-xs">⌘</span>K
+          </kbd>
+        </button>
+
+        <!-- Right Quick Actions -->
+        <div class="pointer-events-auto flex items-center gap-2">
+          <!-- Day / Night Theme Toggle Button -->
+          <button id="btn-theme-toggle" title="Toggle Day / Night Mode" class="flex items-center justify-center w-10 h-10 rounded-2xl bg-white/90 dark:bg-slate-900/90 text-amber-500 dark:text-sky-300 hover:bg-white dark:hover:bg-slate-800 shadow-lg border border-white/40 dark:border-slate-800 transition cursor-pointer active:scale-95">
+            <!-- Sun icon (active in night mode) -->
+            <svg id="icon-sun" class="w-5 h-5 hidden text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+            </svg>
+            <!-- Moon icon (active in day mode) -->
+            <svg id="icon-moon" class="w-5 h-5 text-slate-700 dark:text-sky-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+            </svg>
+          </button>
+
+          <!-- Street View / Ground Walk Mode Button -->
+          <button id="btn-street-view" title="Explore Campus in Ground-Level Street View" class="flex items-center gap-1.5 bg-white/90 dark:bg-slate-900/90 hover:bg-white dark:hover:bg-slate-800 text-slate-800 dark:text-slate-100 font-semibold text-xs sm:text-sm px-3.5 py-2.5 rounded-2xl shadow-lg border border-white/40 dark:border-slate-800 transition cursor-pointer active:scale-95">
+            <span class="text-sm leading-none">🚶</span>
+            <span class="hidden sm:inline">Street View</span>
+          </button>
+
+          <!-- Route Finder Toggle Button -->
+          <button id="route-toggle-btn" class="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs sm:text-sm px-3.5 py-2.5 rounded-2xl shadow-lg shadow-blue-500/25 transition cursor-pointer">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"></path>
+            </svg>
+            <span class="hidden sm:inline">Directions</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- Quick View Filter Pills (Top-center just below header) -->
+      <div class="absolute top-18 left-1/2 -translate-x-1/2 z-10 pointer-events-none flex max-w-[94vw] overflow-x-auto no-scrollbar items-center gap-1.5 bg-white/75 dark:bg-slate-900/80 backdrop-blur-md p-1 rounded-full shadow-md border border-white/30 dark:border-slate-800/50">
+        <button id="btn-start-tour" class="pointer-events-auto shrink-0 px-3 py-1 rounded-full text-xs font-bold bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-xs hover:from-blue-700 hover:to-indigo-700 flex items-center gap-1.5 transition cursor-pointer">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path></svg>
+          <span>Campus Tour</span>
+        </button>
+        <button class="view-preset-btn pointer-events-auto shrink-0 px-3 py-1 rounded-full text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-slate-800 transition" data-view="overview">Overview</button>
+        <button class="view-preset-btn pointer-events-auto shrink-0 px-3 py-1 rounded-full text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-slate-800 transition" data-view="crescent">Main Crescent</button>
+        <button class="view-preset-btn pointer-events-auto shrink-0 px-3 py-1 rounded-full text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-slate-800 transition" data-view="cafes">Food & Cafes</button>
+        <button class="view-preset-btn pointer-events-auto shrink-0 px-3 py-1 rounded-full text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-slate-800 transition" data-view="hostels">Hostels & Quarters</button>
+        <button class="view-preset-btn pointer-events-auto shrink-0 px-3 py-1 rounded-full text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-slate-800 transition" data-view="sports">Sports Ground</button>
+      </div>
+
+      <!-- Floating Map Control Buttons (Bottom Right) -->
+      <div class="absolute bottom-6 right-4 sm:right-6 z-10 flex flex-col gap-2 pointer-events-auto">
+        <!-- Interactive Compass / North Reset Widget -->
+        <button id="btn-compass" title="Realign View North (Click to reset)" class="w-10 h-10 rounded-2xl bg-white/90 dark:bg-slate-900/90 hover:bg-white dark:hover:bg-slate-800 backdrop-blur-md shadow-lg border border-white/40 dark:border-slate-800 flex items-center justify-center cursor-pointer active:scale-95 transition relative group">
+          <div id="compass-needle" class="w-5 h-5 flex items-center justify-center transition-transform duration-75">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none">
+              <!-- North tip (Red) -->
+              <polygon points="12,2 16,12 12,9 8,12" fill="#ef4444" />
+              <!-- South tip (Slate) -->
+              <polygon points="12,22 16,12 12,9 8,12" fill="#94a3b8" />
+            </svg>
+          </div>
+          <span class="absolute -top-1 text-[8px] font-black text-rose-500">N</span>
+        </button>
+
+        <!-- Toggle Building Labels Button -->
+        <button id="btn-labels-toggle" title="Toggle 3D Building Labels" class="w-10 h-10 rounded-2xl bg-white/90 dark:bg-slate-900/90 text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-slate-800 backdrop-blur-md shadow-lg border border-white/40 dark:border-slate-800 flex items-center justify-center cursor-pointer active:scale-95 transition">
+          <svg id="icon-labels-on" class="w-4 h-4 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+          </svg>
+          <svg id="icon-labels-off" class="w-4 h-4 text-slate-400 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18" />
+          </svg>
+        </button>
+
+        <!-- Drag / Rotate Interaction Mode Toggle Button -->
+        <button id="btn-mode-toggle" title="Toggle Drag Map vs Rotate 3D View (Shortcut: R)" class="w-10 h-10 rounded-2xl bg-indigo-600 text-white hover:bg-indigo-700 backdrop-blur-md shadow-lg shadow-indigo-500/30 flex items-center justify-center cursor-pointer active:scale-95 transition">
+          <!-- Hand Icon (Pan Mode: hidden by default) -->
+          <svg id="icon-pan-mode" class="w-5 h-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 11.5V14m0-2.5v-6a1.5 1.5 0 113 0m-3 6a1.5 1.5 0 00-3 0v2a7.5 7.5 0 0015 0v-5a1.5 1.5 0 00-3 0m-6-3V4.5a1.5 1.5 0 113 0v7m0-7a1.5 1.5 0 013 0v5m0-5a1.5 1.5 0 013 0v7"></path>
+          </svg>
+          <!-- Rotate 3D Icon (Rotate Mode: active by default) -->
+          <svg id="icon-rotate-mode" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+          </svg>
+        </button>
+
+        <button id="btn-zoom-in" title="Zoom In" class="w-10 h-10 rounded-2xl bg-white/90 dark:bg-slate-900/90 text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-slate-800 backdrop-blur-md shadow-lg border border-white/40 dark:border-slate-800 flex items-center justify-center font-bold text-lg cursor-pointer active:scale-95 transition">
+          +
+        </button>
+        <button id="btn-zoom-out" title="Zoom Out" class="w-10 h-10 rounded-2xl bg-white/90 dark:bg-slate-900/90 text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-slate-800 backdrop-blur-md shadow-lg border border-white/40 dark:border-slate-800 flex items-center justify-center font-bold text-lg cursor-pointer active:scale-95 transition">
+          −
+        </button>
+        <button id="btn-reset-view" title="Reset Campus View" class="w-10 h-10 rounded-2xl bg-white/90 dark:bg-slate-900/90 text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-slate-800 backdrop-blur-md shadow-lg border border-white/40 dark:border-slate-800 flex items-center justify-center cursor-pointer active:scale-95 transition">
+          <svg class="w-4 h-4 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Navigation & Gesture Helper Bar (Bottom Center) -->
+      <div id="gesture-helper-bar" class="absolute bottom-6 left-1/2 -translate-x-1/2 z-10 pointer-events-none hidden md:flex items-center gap-2.5 bg-slate-900/80 dark:bg-slate-900/90 text-slate-200 text-xs px-4 py-2 rounded-full backdrop-blur-md border border-white/15 shadow-xl transition-all select-none">
+        <span id="helper-mode-badge" class="flex items-center gap-1.5 font-semibold text-emerald-400">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span id="helper-mode-text">🔄 Drag to orbit 3D view</span>
+        </span>
+        <span class="text-slate-500">•</span>
+        <span class="text-slate-300">Right-click / Shift to pan</span>
+        <span class="text-slate-500">•</span>
+        <span class="text-slate-300">Scroll to zoom</span>
+        <span class="text-slate-500">•</span>
+        <span class="text-slate-400 font-mono text-[11px] bg-slate-800 px-1.5 py-0.5 rounded">WASD / Arrows</span>
+      </div>
+
+      <!-- Building Info Modal / Card (Bottom left / slide-in) -->
+      <div id="building-card-container" class="absolute bottom-6 left-4 sm:left-6 z-20 w-full max-w-sm sm:max-w-md pointer-events-none transform translate-y-8 opacity-0 pointer-events-none transition-all duration-300 ease-out">
+        <!-- Building Card content will be injected by BuildingCard.ts -->
+      </div>
+
+      <!-- Navigation & Route HUD Drawer (Top right or floating card) -->
+      <div id="navigation-hud-container" class="absolute top-18 right-4 sm:right-6 z-20 w-full max-w-sm pointer-events-none transform -translate-y-4 opacity-0 transition-all duration-300 ease-out">
+        <!-- Route HUD will be injected by NavHUD.ts -->
+      </div>
+
+      <!-- Search Palette (Modal Overlay) -->
+      <div id="search-modal-backdrop" class="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-sm flex items-start justify-center pt-12 sm:pt-20 px-3 sm:px-4 opacity-0 pointer-events-none transition-opacity duration-200">
+        <div id="search-modal-content" class="w-full max-w-xl bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col max-h-[80vh] transform scale-95 transition-transform duration-200">
+          <!-- Search Header Input -->
+          <div class="flex items-center px-4 py-3.5 border-b border-slate-100 dark:border-slate-800 gap-3">
+            <svg class="w-5 h-5 text-blue-600 dark:text-blue-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+            </svg>
+            <input id="search-input" type="text" placeholder="Search buildings, departments (CSE, IT), canteen, ATM..." class="w-full bg-transparent border-none outline-none text-slate-900 dark:text-white placeholder-slate-400 text-sm sm:text-base font-medium" autocomplete="off" />
+            <button id="search-close-btn" class="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+              </svg>
+            </button>
+          </div>
+
+          <!-- Category Filter Pills -->
+          <div class="flex items-center gap-1.5 px-4 py-2 border-b border-slate-100 dark:border-slate-800 overflow-x-auto text-xs">
+            <button class="search-category-btn px-2.5 py-1 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300 font-semibold cursor-pointer" data-category="all">All</button>
+            <button class="search-category-btn px-2.5 py-1 rounded-full text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 font-medium cursor-pointer" data-category="academic">Academic</button>
+            <button class="search-category-btn px-2.5 py-1 rounded-full text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 font-medium cursor-pointer" data-category="admin">Admin</button>
+            <button class="search-category-btn px-2.5 py-1 rounded-full text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 font-medium cursor-pointer" data-category="amenity">Amenities</button>
+            <button class="search-category-btn px-2.5 py-1 rounded-full text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 font-medium cursor-pointer" data-category="hostel">Hostels</button>
+          </div>
+
+          <!-- Search Results List -->
+          <div id="search-results-list" class="overflow-y-auto p-2 divide-y divide-slate-100 dark:divide-slate-800/60 flex-1">
+            <!-- Injected by SearchPalette.ts -->
+          </div>
+
+          <!-- Search Footer Helper -->
+          <div class="p-3 bg-slate-50 dark:bg-slate-950/50 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[11px] text-slate-400">
+            <span>Tip: Click any building to view departments & start directions</span>
+            <span class="hidden sm:inline">Press <kbd class="px-1.5 py-0.5 bg-slate-200 dark:bg-slate-800 rounded font-mono">ESC</kbd> to close</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
