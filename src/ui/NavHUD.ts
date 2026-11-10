@@ -1,6 +1,17 @@
 import { CAMPUS_WAYPOINTS, type NavWaypoint } from '../data/navGraph';
 import { CAMPUS_BUILDINGS } from '../data/campusData';
 import { findRoute, type RouteResult } from '../utils/pathfinding';
+import type { Maneuver } from '../utils/directions';
+
+/** Arrow shown in the step badge for each kind of turn (depart/arrive have their own icons). */
+const MANEUVER_ICONS: Partial<Record<Maneuver, string>> = {
+  left: '↰',
+  right: '↱',
+  'slight-left': '↖',
+  'slight-right': '↗',
+  'sharp-left': '↩',
+  'sharp-right': '↪',
+};
 
 export class NavHUD {
   private container: HTMLElement;
@@ -215,14 +226,14 @@ export class NavHUD {
       timeText.textContent = `${result.estimatedMinutes} min`;
 
       stepsList.innerHTML = result.instructions.map((inst, idx) => {
-        const isStart = inst.text.toLowerCase().includes('depart');
-        const isEnd = inst.text.toLowerCase().includes('arrive');
+        const isStart = inst.maneuver === 'depart';
+        const isEnd = inst.maneuver === 'arrive';
         const iconBg = isStart ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300' : (isEnd ? 'bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300' : 'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300');
 
         return `
           <div class="nav-step-item flex items-start gap-2.5 py-1.5 px-2 rounded-xl hover:bg-blue-50 dark:hover:bg-slate-800/80 cursor-pointer transition border-b border-slate-100 dark:border-slate-800/60 last:border-0 group" data-step-index="${idx}">
             <span class="w-5 h-5 rounded-full ${iconBg} font-bold text-[10px] flex items-center justify-center shrink-0 mt-0.5 shadow-xs">
-              ${isStart ? '▶' : (isEnd ? '🏁' : idx + 1)}
+              ${isStart ? '▶' : (isEnd ? '🏁' : (MANEUVER_ICONS[inst.maneuver] ?? idx + 1))}
             </span>
             <div class="flex-1 min-w-0">
               <p class="font-medium text-slate-800 dark:text-slate-200 text-xs leading-snug group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">${inst.text}</p>
@@ -233,16 +244,14 @@ export class NavHUD {
         `;
       }).join('');
 
-      // Attach click events on steps to zoom in on waypoint
+      // Attach click events on steps to zoom in on the place where that step happens
       stepsList.querySelectorAll('.nav-step-item').forEach((item) => {
         item.addEventListener('click', (e) => {
           const target = (e.currentTarget as HTMLElement);
           const idx = parseInt(target.dataset.stepIndex || '0', 10);
-          if (result.pathCoordinates && result.pathCoordinates[idx]) {
-            const coord = result.pathCoordinates[idx];
-            if (this.onStepClick) {
-              this.onStepClick(coord);
-            }
+          const step = result.instructions[idx];
+          if (step && this.onStepClick) {
+            this.onStepClick(step.position);
           }
         });
       });

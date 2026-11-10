@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { CameraController } from './CameraController';
-import type { RouteResult } from '../utils/pathfinding';
+import { instructionIndexAt, type RouteResult } from '../utils/pathfinding';
+import { WALKING_SPEED_MPS } from '../utils/geo';
 
 export interface WalkthroughState {
   progress: number; // 0 to 1
@@ -157,10 +158,10 @@ export class WalkthroughController {
     this.avatarSphere.position.y = 1.6 + Math.sin(timeMs * 0.006) * 0.18;
 
     if (this.isPlaying) {
-      // Walking speed ~ 4.5 km/h = 1.25 m/s.
+      // Walking speed ~ 4.5 km/h = 1.25 m/s (world units are meters).
       // Curve total distance in meters = currentRoute.totalDistanceMeters.
       const totalMeters = Math.max(10, this.currentRoute.totalDistanceMeters);
-      const walkingSpeedMetersPerSec = 4.2 * this.speedMultiplier;
+      const walkingSpeedMetersPerSec = WALKING_SPEED_MPS * this.speedMultiplier;
       const progressDelta = (walkingSpeedMetersPerSec / totalMeters) * deltaTimeSeconds;
 
       this.progress += progressDelta;
@@ -224,10 +225,10 @@ export class WalkthroughController {
   }
 
   private getCurrentInstruction(): string {
-    if (!this.currentRoute || !this.currentRoute.instructions.length) return '';
-    const numInstructions = this.currentRoute.instructions.length;
-    const index = Math.min(numInstructions - 1, Math.floor(this.progress * numInstructions));
-    return this.currentRoute.instructions[index]?.text || '';
+    if (!this.currentRoute) return '';
+    // Steps are different lengths now, so pick the one covering the distance walked so far.
+    const index = instructionIndexAt(this.currentRoute.instructions, this.progress);
+    return this.currentRoute.instructions[index]?.text ?? '';
   }
 
   private notifyProgress() {

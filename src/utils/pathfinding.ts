@@ -1,127 +1,102 @@
 import { CAMPUS_WAYPOINTS, type NavWaypoint } from '../data/navGraph';
+import { CAMPUS_BUILDINGS } from '../data/campusData';
+import { METERS_PER_UNIT, WALKING_SPEED_MPS, type XYZ } from './geo';
+import { routeOnRoads } from './roadGraph';
+import { buildDirections, type DirectionStep, type Landmark } from './directions';
+
+export type RouteInstruction = DirectionStep;
 
 export interface RouteResult {
+  /** The start and end waypoints of the route. */
   waypoints: NavWaypoint[];
-  pathCoordinates: [number, number, number][];
+  /** Walking path, [x, y, z] points following the campus roads. */
+  pathCoordinates: XYZ[];
   totalDistanceMeters: number;
   estimatedMinutes: number;
-  instructions: { text: string; distanceMeters: number }[];
+  /** Turn-by-turn steps; the first is "Depart", the last is "Arrive". */
+  instructions: RouteInstruction[];
 }
 
-function distance(p1: [number, number, number], p2: [number, number, number]): number {
-  const dx = p1[0] - p2[0];
-  const dy = p1[1] - p2[1];
-  const dz = p1[2] - p2[2];
-  return Math.sqrt(dx * dx + dy * dy + dz * dz);
+const buildingShortNames = new Map(CAMPUS_BUILDINGS.map((b) => [b.id, b.shortName]));
+
+/** Named places to mention in directions, leaving out the start and end buildings themselves. */
+function landmarksExcluding(startWp: NavWaypoint, endWp: NavWaypoint): Landmark[] {
+  const skip = new Set([startWp.buildingId, endWp.buildingId]);
+  const landmarks: Landmark[] = [];
+  for (const wp of Object.values(CAMPUS_WAYPOINTS)) {
+    if (!wp.buildingId || skip.has(wp.buildingId)) continue;
+    landmarks.push({ name: buildingShortNames.get(wp.buildingId) ?? wp.name, position: wp.position });
+  }
+  return landmarks;
+}
+
+/** Result for "start and end are the same spot": nothing to walk. */
+function alreadyThere(startWp: NavWaypoint, endWp: NavWaypoint): RouteResult {
+  return {
+    waypoints: startWp === endWp ? [startWp] : [startWp, endWp],
+    pathCoordinates: [endWp.position],
+    totalDistanceMeters: 0,
+    estimatedMinutes: 0,
+    instructions: [
+      {
+        text: `You are already at ${endWp.name}`,
+        distanceMeters: 0,
+        position: endWp.position,
+        maneuver: 'arrive',
+      },
+    ],
+  };
 }
 
 export function findRoute(startId: string, endId: string): RouteResult | null {
-  if (!CAMPUS_WAYPOINTS[startId] || !CAMPUS_WAYPOINTS[endId]) return null;
-  if (startId === endId) {
-    const wp = CAMPUS_WAYPOINTS[startId];
-    return {
-      waypoints: [wp],
-      pathCoordinates: [wp.position],
-      totalDistanceMeters: 0,
-      estimatedMinutes: 0,
-      instructions: [{ text: `You are already at ${wp.name}`, distanceMeters: 0 }]
-    };
-  }
+  const startWp = CAMPUS_WAYPOINTS[startId];
+  const endWp = CAMPUS_WAYPOINTS[endId];
+  if (!startWp || !endWp) return null;
+  if (startId === endId) return alreadyThere(startWp, endWp);
 
-  const openSet = new Set<string>([startId]);
-  const cameFrom = new Map<string, string>();
-  
-  const gScore = new Map<string, number>();
-  const fScore = new Map<string, number>();
+  const path = routeOnRoads(startId, endId);
+  if (!path) return null;
+  // Two different waypoints on exactly the same spot.
+  if (path.length < 2) return alreadyThere(startWp, endWp);
 
-  Object.keys(CAMPUS_WAYPOINTS).forEach((id) => {
-    gScore.set(id, Infinity);
-    fScore.set(id, Infinity);
+  const { steps, totalLength } = buildDirections({
+    points: path,
+    startName: startWp.name,
+    endName: endWp.name,
+    landmarks: landmarksExcluding(startWp, endWp),
   });
 
-  gScore.set(startId, 0);
-  fScore.set(startId, distance(CAMPUS_WAYPOINTS[startId].position, CAMPUS_WAYPOINTS[endId].position));
+  const totalDistanceMeters = Math.round(totalLength * METERS_PER_UNIT);
+  const estimatedMinutes = Math.max(1, Math.round(totalDistanceMeters / (WALKING_SPEED_MPS * 60)));
 
-  while (openSet.size > 0) {
-    // Pick node in openSet with lowest fScore
-    let current = '';
-    let minF = Infinity;
-    for (const node of openSet) {
-      const f = fScore.get(node) ?? Infinity;
-      if (f < minF) {
-        minF = f;
-        current = node;
-      }
-    }
+  return {
+    waypoints: [startWp, endWp],
+    pathCoordinates: path,
+    totalDistanceMeters,
+    estimatedMinutes,
+    instructions: steps,
+  };
+}
 
-    if (current === endId) {
-      // Reconstruct path
-      const path: NavWaypoint[] = [];
-      let currId: string | undefined = current;
-      while (currId) {
-        path.unshift(CAMPUS_WAYPOINTS[currId]);
-        currId = cameFrom.get(currId);
-      }
+/**
+ * Which instruction is active at a given progress (0..1) along the route.
+ * Steps are weighted by the distance they cover, so a long straight leg stays on
+ * its instruction for as long as it takes to walk it.
+ */
+export function instructionIndexAt(instructions: RouteInstruction[], progress: number): number {
+  if (instructions.length === 0) return -1;
+  const total = instructions.reduce((sum, step) => sum + step.distanceMeters, 0);
+  if (total <= 0) return 0;
 
-      // Compute distances & instructions
-      // Scale: 1 unit ~ 3 meters
-      const UNIT_TO_METERS = 3.2;
-      let totalDistanceUnits = 0;
-      const instructions: { text: string; distanceMeters: number }[] = [];
-
-      for (let i = 0; i < path.length - 1; i++) {
-        const segDistUnits = distance(path[i].position, path[i + 1].position);
-        totalDistanceUnits += segDistUnits;
-        const segMeters = Math.round(segDistUnits * UNIT_TO_METERS);
-        
-        let direction = 'Head towards';
-        if (i === 0) {
-          direction = 'Depart from';
-        } else if (i === path.length - 2) {
-          direction = 'Arrive at';
-        }
-
-        instructions.push({
-          text: `${direction} ${path[i + 1].name}`,
-          distanceMeters: segMeters
-        });
-      }
-
-      const totalDistanceMeters = Math.round(totalDistanceUnits * UNIT_TO_METERS);
-      // Average walking speed ~ 4.5 km/h = 75 meters/minute
-      const estimatedMinutes = Math.max(1, Math.round(totalDistanceMeters / 75));
-
-      return {
-        waypoints: path,
-        pathCoordinates: path.map(w => w.position),
-        totalDistanceMeters,
-        estimatedMinutes,
-        instructions
-      };
-    }
-
-    openSet.delete(current);
-    const currentWp = CAMPUS_WAYPOINTS[current];
-
-    for (const neighborId of currentWp.neighbors) {
-      const neighborWp = CAMPUS_WAYPOINTS[neighborId];
-      if (!neighborWp) continue;
-
-      const tentativeG = (gScore.get(current) ?? Infinity) + distance(currentWp.position, neighborWp.position);
-
-      if (tentativeG < (gScore.get(neighborId) ?? Infinity)) {
-        cameFrom.set(neighborId, current);
-        gScore.set(neighborId, tentativeG);
-        const h = distance(neighborWp.position, CAMPUS_WAYPOINTS[endId].position);
-        fScore.set(neighborId, tentativeG + h);
-        openSet.add(neighborId);
-      }
-    }
+  const covered = Math.max(0, Math.min(1, progress)) * total;
+  let acc = 0;
+  for (let i = 0; i < instructions.length; i++) {
+    acc += instructions[i].distanceMeters;
+    if (covered < acc) return i;
   }
-
-  return null;
+  return instructions.length - 1;
 }
 
 export function getWaypointForBuilding(buildingId: string): NavWaypoint | undefined {
-  return Object.values(CAMPUS_WAYPOINTS).find(wp => wp.buildingId === buildingId);
+  return Object.values(CAMPUS_WAYPOINTS).find((wp) => wp.buildingId === buildingId);
 }

@@ -261,10 +261,13 @@ export class CampusScene {
 
     const points = coordinates.map(([x, , z]) => new THREE.Vector3(x, 0.38, z));
     const curve = new THREE.CatmullRomCurve3(points, false, 'catmullrom', 0.15);
-    const tubeGeo = new THREE.TubeGeometry(curve, points.length * 8, 0.45, 8, false);
-    
+    // Size the tube and its dash pattern by the route's length, not its number of points:
+    // routes follow the road polylines now, so the point count varies a lot per meter.
+    const routeLength = curve.getLength();
+    const tubeGeo = new THREE.TubeGeometry(curve, Math.max(16, Math.ceil(routeLength / 2)), 0.45, 8, false);
+
     if (this.pathTexture) {
-      this.pathTexture.repeat.set(points.length * 3, 1);
+      this.pathTexture.repeat.set(Math.max(2, Math.round(routeLength / 9)), 1);
     }
 
     const tubeMat = new THREE.MeshBasicMaterial({
