@@ -1,6 +1,13 @@
 @import "tailwindcss";
 /* MAKAUT 3D Campus Navigator */
 
+/*
+ * Tailwind v4 applies `dark:` styles from the OS setting (prefers-color-scheme)
+ * by default. The in-app Day/Night button toggles a `.dark` class on <html>
+ * (see main.ts), so tell Tailwind to key the dark variant off that class.
+ */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @layer base {
   * {
     box-sizing: border-box;
